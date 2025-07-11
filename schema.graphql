@@ -1,0 +1,465 @@
+# Core Entities
+type Vault @entity {
+  id: Bytes! # vault address
+  manager: Bytes! # address
+  underlyingAsset: Bytes! # address
+  name: String!
+  symbol: String!
+  maxCapacity: BigInt!
+  
+  # Current state
+  totalAssets: BigInt!
+  totalSupply: BigInt!
+  sharePrice: BigInt!
+  aum: BigInt! # Assets Under Management (current market value)
+  currentEpoch: BigInt!
+  state: VaultState!
+  
+  # Oracle protection
+  harvestCooldown: BigInt!
+  maxPriceDeviationBps: BigInt!
+  emergencyMode: Boolean!
+  
+  # Status
+  isPaused: Boolean!
+  
+  # Real-time tracking
+  lastValueUpdate: BigInt! # timestamp of last value update
+  valueUpdateCount: BigInt! # number of value updates
+  lastContractCall: BigInt! # timestamp of last contract call
+  
+  # Relationships
+  deposits: [Deposit!]! @derivedFrom(field: "vault")
+  withdrawals: [Withdrawal!]! @derivedFrom(field: "vault")
+  users: [VaultUser!]! @derivedFrom(field: "vault")
+  epochHistory: [EpochChange!]! @derivedFrom(field: "vault")
+  contractCalls: [ContractCall!]! @derivedFrom(field: "vault")
+  valueChanges: [VaultValueChange!]! @derivedFrom(field: "vault")
+  yieldHarvests: [YieldHarvested!]! @derivedFrom(field: "vault")
+  externalTransfers: [ExternalTokenTransfer!]! @derivedFrom(field: "vault")
+  
+  # Metadata
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type VaultFactory @entity {
+  id: Bytes! # factory address
+  
+  # Configuration
+  admin: Bytes!
+  treasury: Bytes!
+  governance: Bytes!
+  assetHandler: Bytes!
+  vaultStorageVersion: BigInt!
+  
+  # Statistics
+  totalVaults: BigInt!
+  creationFee: BigInt!
+  
+  # Status
+  isPaused: Boolean!
+  
+  # Relationships
+  whitelistedAssets: [WhitelistedAsset!]! @derivedFrom(field: "factory")
+  underlyingAssets: [UnderlyingAsset!]! @derivedFrom(field: "factory")
+}
+
+type User @entity {
+  id: Bytes! # user address
+  
+  # Relationships
+  vaultPositions: [VaultUser!]! @derivedFrom(field: "user")
+  deposits: [Deposit!]! @derivedFrom(field: "user")
+  withdrawals: [Withdrawal!]! @derivedFrom(field: "user")
+  
+  # Statistics
+  totalDeposited: BigInt!
+  totalWithdrawn: BigInt!
+  vaultCount: BigInt!
+  
+  # Timestamps
+  firstDepositAt: BigInt!
+  lastActivityAt: BigInt!
+}
+
+type VaultUser @entity {
+  id: ID! # vault-user combination
+  vault: Vault!
+  user: User!
+  
+  # Position data
+  shares: BigInt!
+  totalDeposited: BigInt!
+  totalWithdrawn: BigInt!
+  
+  # Status
+  isActive: Boolean!
+  
+  # Timestamps
+  firstDepositAt: BigInt!
+  lastActivityAt: BigInt!
+}
+
+# Transaction Events
+type Deposit @entity(immutable: true) {
+  id: Bytes! # tx hash + log index
+  vault: Vault!
+  user: User!
+  
+  # ERC4626 standard fields
+  sender: Bytes!
+  owner: Bytes!
+  assets: BigInt!
+  shares: BigInt!
+  
+  # Block data
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type Withdrawal @entity(immutable: true) {
+  id: Bytes! # tx hash + log index
+  vault: Vault!
+  user: User!
+  
+  # ERC4626 standard fields
+  sender: Bytes!
+  receiver: Bytes!
+  owner: Bytes!
+  assets: BigInt!
+  shares: BigInt!
+  
+  # Block data
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+# Vault Operations
+type EpochChange @entity(immutable: true) {
+  id: Bytes! # tx hash + log index
+  vault: Vault!
+  
+  # Epoch data
+  oldEpoch: BigInt!
+  newEpoch: BigInt!
+  totalAssetsReturned: BigInt!
+  
+  # Block data
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type StateChange @entity(immutable: true) {
+  id: Bytes! # tx hash + log index
+  vault: Vault!
+  
+  # State data
+  epoch: BigInt!
+  oldState: VaultState!
+  newState: VaultState!
+  
+  # Block data
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type ContractCall @entity(immutable: true) {
+  id: Bytes! # tx hash + log index
+  vault: Vault!
+  
+  # Call data
+  target: Bytes!
+  data: Bytes!
+  value: BigInt!
+  
+  # Transaction type from PlatformGuard
+  transactionType: TransactionType!
+  
+  # Block data
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type VaultValueChange @entity(immutable: true) {
+  id: Bytes! # tx hash + log index
+  vault: Vault!
+  
+  # Value changes
+  oldTotalAssets: BigInt!
+  newTotalAssets: BigInt!
+  oldTotalSupply: BigInt!
+  newTotalSupply: BigInt!
+  oldSharePrice: BigInt!
+  newSharePrice: BigInt!
+  oldAum: BigInt!
+  newAum: BigInt!
+  
+  # Change trigger
+  changeType: VaultValueChangeType!
+  triggerEvent: String!
+  
+  # Block data
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+# External Transfer Events
+type YieldHarvested @entity(immutable: true) {
+  id: Bytes! # tx hash + log index
+  vault: Vault!
+  
+  # Harvest data
+  asset: Bytes! # asset being harvested
+  amount: BigInt! # total amount harvested
+  managementFee: BigInt! # fee paid to manager
+  performanceFee: BigInt! # performance fee
+  protocolFee: BigInt! # protocol fee
+  
+  # Block data
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+
+
+type ExternalTokenTransfer @entity(immutable: true) {
+  id: Bytes! # tx hash + log index
+  vault: Vault!
+  
+  # Transfer details
+  token: Bytes! # token address
+  transferType: ExternalTransferType!
+  amount: BigInt! # transfer amount
+  destination: Bytes! # destination address (for approvals, wraps, etc.)
+  
+  # Block data
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type AutoRealization @entity(immutable: true) {
+  id: Bytes! # tx hash + log index
+  vault: Vault!
+  
+  # Realization data
+  triggeredBy: Bytes!
+  preRealizationValue: BigInt!
+  totalFeesExtracted: BigInt!
+  
+  # Block data
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type AllPositionsLiquidation @entity(immutable: true) {
+  id: Bytes! # tx hash + log index
+  vault: Vault!
+  
+  # Liquidation data
+  totalConvertedValue: BigInt!
+  
+  # Block data
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+# Factory Configuration
+type WhitelistedAsset @entity {
+  id: Bytes! # asset address
+  factory: VaultFactory!
+  asset: Bytes!
+  tokenType: Int!
+  allowed: Boolean!
+  
+  # Timestamps
+  addedAt: BigInt!
+  removedAt: BigInt
+  addedInBlock: BigInt!
+  addedInTx: Bytes!
+}
+
+type UnderlyingAsset @entity {
+  id: Bytes! # asset address
+  factory: VaultFactory!
+  asset: Bytes!
+  tokenType: Int!
+  
+  # Status
+  isActive: Boolean!
+  
+  # Timestamps
+  addedAt: BigInt!
+  removedAt: BigInt
+  addedInBlock: BigInt!
+  addedInTx: Bytes!
+}
+
+# Daily Statistics
+type DailyVaultStat @entity {
+  id: ID! # vault-address-YYYY-MM-DD
+  vault: Bytes!
+  date: Int! # timestamp rounded to day
+  
+  # Volume
+  dailyDeposits: BigInt!
+  dailyWithdrawals: BigInt!
+  dailyVolume: BigInt!
+  
+  # TVL
+  totalAssets: BigInt!
+  sharePrice: BigInt!
+  totalSupply: BigInt!
+  
+  # User activity
+  activeUsers: BigInt!
+  newUsers: BigInt!
+}
+
+type DailyProtocolStat @entity {
+  id: ID! # YYYY-MM-DD
+  date: Int! # timestamp rounded to day
+  
+  # Protocol metrics
+  totalValueLocked: BigInt!
+  totalVaults: BigInt!
+  activeVaults: BigInt!
+  
+  # Volume
+  dailyVolume: BigInt!
+  dailyDeposits: BigInt!
+  dailyWithdrawals: BigInt!
+  
+  # Users
+  totalUsers: BigInt!
+  activeUsers: BigInt!
+  newUsers: BigInt!
+}
+
+# Enums
+enum VaultState {
+  FUNDRAISING
+  ACTIVE
+  LOCKED
+  LIQUIDATED
+  CLOSED
+}
+
+enum VaultValueChangeType {
+  DEPOSIT
+  WITHDRAW
+  CONTRACT_CALL
+  EPOCH_CHANGE
+  AUTO_REALIZATION
+  TRANSFER
+  MANUAL_SYNC
+  YIELD_HARVEST
+}
+
+enum ExternalTransferType {
+  ERC20_APPROVAL
+  ERC721_APPROVAL
+  WRAP_NATIVE_TOKEN
+  UNWRAP_NATIVE_TOKEN
+  YIELD_HARVEST
+  CONTRACT_INTERACTION
+}
+
+enum TransactionType {
+  NotUsed         # 0
+  Approve         # 1
+  Exchange        # 2
+  AddLiquidity    # 3
+  RemoveLiquidity # 4
+  SetDelegateApproval # 5
+  Stake           # 6
+  Unstake         # 7
+  Claim           # 8
+  WrapNativeToken # 9
+  UnwrapNativeToken # 10
+}
+
+# Protocol Events (for backward compatibility)
+type AdminAddressSet @entity(immutable: true) {
+  id: Bytes!
+  adminAddress: Bytes!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type TreasuryAddressSet @entity(immutable: true) {
+  id: Bytes!
+  treasuryAddress: Bytes!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type GovernanceAddressSet @entity(immutable: true) {
+  id: Bytes!
+  governanceAddress: Bytes!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type VaultCreated @entity(immutable: true) {
+  id: Bytes!
+  vault: Bytes!
+  manager: Bytes!
+  underlyingAsset: Bytes!
+  name: String!
+  symbol: String!
+  maxCapacity: BigInt!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type VaultUpgraded @entity(immutable: true) {
+  id: Bytes!
+  vault: Bytes!
+  newImplementation: Bytes!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type OwnershipTransferred @entity(immutable: true) {
+  id: Bytes!
+  previousOwner: Bytes!
+  newOwner: Bytes!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type Paused @entity(immutable: true) {
+  id: Bytes!
+  account: Bytes!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type Unpaused @entity(immutable: true) {
+  id: Bytes!
+  account: Bytes!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+

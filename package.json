@@ -1,0 +1,40 @@
+{
+  "name": "strtm-subgraph",
+  "license": "UNLICENSED",
+  "scripts": {
+    "codegen": "graph codegen",
+    "build": "graph build",
+    "deploy": "graph deploy --node https://api.studio.thegraph.com/deploy/ strtm-subgraph",
+    "create-local": "graph create --node http://localhost:8020/ strtm-subgraph",
+    "remove-local": "graph remove --node http://localhost:8020/ strtm-subgraph",
+    "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 strtm-subgraph",
+    "prepare:monad": "mustache config/monad.json subgraph.template.yaml > subgraph.yaml",
+    "prepare:arbitrum": "mustache config/arbitrum.json subgraph.template.yaml > subgraph.yaml",
+    "deploy:monad": "graph deploy --node https://api.studio.thegraph.com/deploy/ strtm-monad",
+    "deploy:arbitrum": "graph deploy --node https://api.studio.thegraph.com/deploy/ strtm-arbitrum", 
+    "switch:monad": "yarn prepare:monad && yarn codegen && yarn build",
+    "switch:arbitrum": "yarn prepare:arbitrum && yarn codegen && yarn build",
+    "build:monad": "yarn switch:monad && yarn deploy:monad",
+    "build:arbitrum": "yarn switch:arbitrum && yarn deploy:arbitrum",
+    "auth": "graph auth --studio $GRAPH_DEPLOY_KEY",
+    "create:monad": "graph create --studio strtm-monad",
+    "create:arbitrum": "graph create --studio strtm-arbitrum",
+    "goldsky:auth": "goldsky login",
+    "goldsky:deploy:monad": "yarn switch:monad && goldsky subgraph deploy strtm-monad/v1.1.0 --from-abi",
+    "goldsky:deploy:arbitrum": "yarn switch:arbitrum && goldsky subgraph deploy strtm-arbitrum/v1.1.0 --from-abi",
+    "goldsky:delete:monad": "goldsky subgraph delete strtm-monad",
+    "goldsky:delete:arbitrum": "goldsky subgraph delete strtm-arbitrum",
+    "goldsky:list": "goldsky subgraph list",
+    "goldsky:logs:monad": "goldsky subgraph logs strtm-monad",
+    "goldsky:logs:arbitrum": "goldsky subgraph logs strtm-arbitrum"
+  },
+  "dependencies": {
+    "@graphprotocol/graph-cli": "0.70.0",
+    "@graphprotocol/graph-ts": "0.32.0"
+  },
+  "devDependencies": {
+    "matchstick-as": "0.5.0",
+    "mustache": "^4.2.0"
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+}

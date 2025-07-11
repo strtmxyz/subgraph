@@ -1,0 +1,7 @@
+{
+  "network": "arbitrum-one",
+  "address": "0x0000000000000000000000000000000000000000", 
+  "startBlock": 0,
+  "governance": "0x0000000000000000000000000000000000000000",
+  "governanceStartBlock": 0
+} 

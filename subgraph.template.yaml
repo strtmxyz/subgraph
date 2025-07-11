@@ -1,0 +1,251 @@
+specVersion: 1.0.0
+indexerHints:
+  prune: auto
+schema:
+  file: ./schema.graphql
+dataSources:
+  # VaultFactory Contract - Main entry point
+  - kind: ethereum
+    name: VaultFactory
+    network: {{ network }}
+    source:
+      address: "{{ address }}"
+      abi: VaultFactory
+      startBlock: {{ startBlock }}
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - VaultFactory
+        - Vault
+        - WhitelistedAsset
+        - UnderlyingAsset
+        - VaultCreated
+        - VaultUpgraded
+        - AdminAddressSet
+        - TreasuryAddressSet
+        - OwnershipTransferred
+        - Paused
+        - Unpaused
+      abis:
+        - name: VaultFactory
+          file: ./abi/VaultFactory.json
+        - name: Vault
+          file: ./abi/Vault.json
+      eventHandlers:
+        # Core vault creation event
+        - event: VaultCreated(indexed address,indexed address,indexed address,string,string,uint256)
+          handler: handleVaultCreated
+        
+        # Vault management
+        - event: VaultUpgraded(indexed address,indexed address)
+          handler: handleVaultUpgraded
+        - event: VaultImplementationUpdated(indexed address,indexed address)
+          handler: handleVaultImplementationUpdated
+        
+        # Asset management
+        - event: AssetWhitelisted(indexed address,uint16,bool)
+          handler: handleAssetWhitelisted
+        - event: AssetWhitelistedRemoved(indexed address)
+          handler: handleAssetWhitelistedRemoved
+        - event: UnderlyingAssetAdded(indexed address,uint16)
+          handler: handleUnderlyingAssetAdded
+        - event: UnderlyingAssetRemoved(indexed address)
+          handler: handleUnderlyingAssetRemoved
+        
+        # Factory configuration
+        - event: AdminAddressSet(indexed address)
+          handler: handleAdminAddressSet
+        - event: TreasuryAddressSet(indexed address)
+          handler: handleTreasuryAddressSet
+        - event: GovernanceAddressSet(indexed address)
+          handler: handleGovernanceAddressSet
+        - event: SetAssetHandler(indexed address)
+          handler: handleSetAssetHandler
+        - event: SetVaultStorageVersion(uint256)
+          handler: handleSetVaultStorageVersion
+        
+        # Access control
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handleOwnershipTransferred
+        - event: Paused(address)
+          handler: handlePaused
+        - event: Unpaused(address)
+          handler: handleUnpaused
+      file: ./src/vault-factory.ts
+
+  # Governance Contract
+  - kind: ethereum
+    name: Governance
+    network: {{ network }}
+    source:
+      address: "{{ governance }}"
+      abi: Governance
+      startBlock: {{ governanceStartBlock }}
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - WhitelistedAsset
+      abis:
+        - name: Governance
+          file: ./abi/Governance.json
+      eventHandlers:
+        - event: AssetGuardSet(uint16,address)
+          handler: handleAssetGuardSet
+        - event: ContractGuardSet(address,address)
+          handler: handleContractGuardSet
+      file: ./src/governance.ts
+
+templates:
+  # Template for Vault instances
+  - kind: ethereum
+    name: Vault
+    network: {{ network }}
+    source:
+      abi: Vault
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Vault
+        - User
+        - VaultUser
+        - Deposit
+        - Withdrawal
+        - EpochChange
+        - StateChange
+        - ContractCall
+        - AutoRealization
+        - AllPositionsLiquidation
+        - DailyVaultStat
+        - DailyProtocolStat
+        - YieldHarvested
+        - FeesExtracted
+        - ExternalTokenTransfer
+      abis:
+        - name: Vault
+          file: ./abi/Vault.json
+        - name: IERC20
+          file: ./abi/IWETH.json
+      eventHandlers:
+        # Core vault lifecycle
+        - event: StateChanged(indexed uint256,indexed uint8,indexed uint8,uint256)
+          handler: handleStateChanged
+        - event: EpochAdvanced(indexed uint256,indexed uint256,uint256,uint256)
+          handler: handleEpochAdvanced
+        
+        # User interactions (ERC4626 standard)
+        - event: Deposit(indexed address,indexed address,uint256,uint256)
+          handler: handleDeposit
+        - event: Withdraw(indexed address,indexed address,indexed address,uint256,uint256)
+          handler: handleWithdraw
+        
+        # Custom vault events
+        - event: Deposited(indexed address,indexed address,indexed address,uint256,uint256)
+          handler: handleDeposited
+        - event: Withdrawn(indexed address,indexed address,indexed address,uint256,uint256)
+          handler: handleWithdrawn
+        
+        # Vault operations
+        - event: ContractCalled(indexed address,indexed address,bytes,uint256)
+          handler: handleContractCalled
+        - event: AutoRealizationTriggered(indexed address,uint256,uint256,uint256)
+          handler: handleAutoRealizationTriggered
+        - event: AllPositionsLiquidated(uint256,uint256)
+          handler: handleAllPositionsLiquidated
+        
+        # Oracle protection
+        - event: OracleProtectionUpdated(uint256,uint256,bool)
+          handler: handleOracleProtectionUpdated
+        - event: EmergencyOracleModeActivated()
+          handler: handleEmergencyOracleModeActivated
+        - event: HarvestBlocked(string,uint256,address[])
+          handler: handleHarvestBlocked
+        
+        # Access control
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handleOwnershipTransferred
+        - event: Paused(address)
+          handler: handlePaused
+        - event: Unpaused(address)
+          handler: handleUnpaused
+        
+        # ERC20 events for share tracking
+        - event: Transfer(indexed address,indexed address,uint256)
+          handler: handleTransfer
+        - event: Approval(indexed address,indexed address,uint256)
+          handler: handleApproval
+        
+        # External transfers and yield operations
+        - event: YieldHarvested(indexed address,indexed address,uint256,uint256,uint256,uint256)
+          handler: handleYieldHarvested
+      file: ./src/vault.ts
+
+  # Platform Guard Template - for tracking DeFi activities  
+  - kind: ethereum
+    name: PlatformGuard
+    network: {{ network }}
+    source:
+      abi: IPlatformGuard
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - ContractCall
+      abis:
+        - name: IPlatformGuard
+          file: ./abi/IPlatformGuard.json
+      eventHandlers:
+        # DEX activities
+        - event: ExchangeFrom(address,address,address,uint256,address)
+          handler: handleExchangeFrom
+        - event: ExchangeTo(address,address,address,address,uint256)
+          handler: handleExchangeTo
+        - event: AddLiquidity(address,address,address,bytes)
+          handler: handleAddLiquidity
+        - event: RemoveLiquidity(address,address,address,bytes)
+          handler: handleRemoveLiquidity
+        
+        # Other platform activities
+        - event: UnwrapNativeToken(address,address,uint256)
+          handler: handleUnwrapNativeToken
+        - event: VertexDeposit(address,address,uint256)
+          handler: handleVertexDeposit
+        - event: VertexSlowMode(address,address,uint256)
+          handler: handleVertexSlowMode
+      file: ./src/platform-guard.ts
+
+  # Asset Guard Template - for tracking external token transfers
+  - kind: ethereum
+    name: AssetGuard
+    network: {{ network }}
+    source:
+      abi: ERC20Guard
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - ContractCall
+        - ExternalTokenTransfer
+      abis:
+        - name: ERC20Guard
+          file: ./abi/ERC20Guard.json
+      eventHandlers:
+        # External token operations
+        - event: ERC20Approval(address,address,address,uint256)
+          handler: handleERC20Approval
+        - event: ERC721Approval(address,address,address,uint256)
+          handler: handleERC721Approval
+        - event: WrapNativeToken(address,address,uint256)
+          handler: handleWrapNativeToken
+        - event: UnwrapNativeToken(address,address,uint256)
+          handler: handleUnwrapNativeToken
+        - event: Initialized(uint64)
+          handler: handleInitialized
+      file: ./src/asset-guard.ts

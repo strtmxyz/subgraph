@@ -1,0 +1,7 @@
+{
+  "network": "arbitrum-sepolia",
+  "address": "0x65fA89C281F0762971bEb4F7031c07DBe04F7089",
+  "startBlock": 170150806,
+  "governance": "0xdCeD2CBC87A0d99e8F757182eb3a628F1e78B89B",
+  "governanceStartBlock": 170150806
+} 
