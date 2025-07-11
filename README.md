@@ -1,15 +1,15 @@
 # Stratum Vault Subgraph
 
-A subgraph để index và query dữ liệu từ Stratum Vault protocol trên Sepolia và Arbitrum.
+A subgraph for indexing and querying data from the Stratum Vault protocol on Sepolia and Arbitrum.
 
 ## 🏗️ **Architecture**
 
 ### **Core Entities:**
-- **`Vault`** - Investment vaults với ERC4626 standard
-- **`VaultFactory`** - Factory contract quản lý việc tạo vaults
-- **`User`** - Người dùng và portfolio của họ
-- **`VaultUser`** - Vị thế của user trong từng vault
-- **`Deposit/Withdrawal`** - Các giao dịch nạp/rút
+- **`Vault`** - Investment vaults with ERC4626 standard
+- **`VaultFactory`** - Factory contract managing vault creation
+- **`User`** - Users and their portfolios
+- **`VaultUser`** - User positions in each vault
+- **`Deposit/Withdrawal`** - Deposit and withdrawal transactions
 
 ### **Events Tracking:**
 - Vault lifecycle (StateChanged, EpochAdvanced)
@@ -223,38 +223,38 @@ subgraph.template.yaml       # Subgraph configuration template
 
 ### **Common Issues:**
 
-1. **Linter errors về modules:**
+1. **Linter errors about modules:**
    ```bash
-   # Normal trước khi chạy codegen
-   yarn codegen  # Sẽ generate types và fix errors
+   # Normal before running codegen
+   yarn codegen  # Will generate types and fix errors
    ```
 
 2. **ABI mismatch:**
    ```bash
-   # Kiểm tra events trong ABI match với subgraph.template.yaml
-   # Update template nếu cần
+   # Check that events in ABI match with subgraph.template.yaml
+   # Update template if needed
    ```
 
 3. **Network mismatch:**
    ```bash
-   # Kiểm tra network name trong config files
+   # Check network name in config files
    # Sepolia: "sepolia"
    # Arbitrum: "arbitrum-one"  
    ```
 
 4. **Start block too early:**
    ```bash
-   # Set startBlock = deployment block của contract
-   # Tránh sync quá nhiều empty blocks
+   # Set startBlock = deployment block of contract
+   # Avoid syncing too many empty blocks
    ```
 
 ## 📝 **Notes**
 
-- Subgraph sử dụng **ERC4626 standard** cho vault interactions
-- **Daily statistics** được tự động tính toán
-- **Platform activities** được track qua ContractCall entities
-- **Oracle protection** events được handle riêng biệt
-- Support cả **Flexible** và **Non-Flexible** vaults trong cùng template
+- Subgraph uses **ERC4626 standard** for vault interactions
+- **Daily statistics** are automatically calculated
+- **Platform activities** are tracked via ContractCall entities
+- **Oracle protection** events are handled separately
+- Supports both **Flexible** and **Non-Flexible** vaults in the same template
 
 ## 🔗 **Links**
 
