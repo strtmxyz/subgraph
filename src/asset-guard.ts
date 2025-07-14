@@ -27,6 +27,7 @@ export function handleERC20Approval(event: ERC20ApprovalEvent): void {
   contractCall.target = event.params.token;
   contractCall.data = Bytes.empty();
   contractCall.value = BigInt.zero();
+  contractCall.transactionType = "Approve"; // Set transaction type
   contractCall.blockNumber = event.block.number;
   contractCall.blockTimestamp = event.block.timestamp;
   contractCall.transactionHash = event.transaction.hash;
@@ -63,6 +64,7 @@ export function handleERC721Approval(event: ERC721ApprovalEvent): void {
   contractCall.target = event.params.token;
   contractCall.data = Bytes.empty();
   contractCall.value = event.params.tokenId;
+  contractCall.transactionType = "Approve"; // Set transaction type
   contractCall.blockNumber = event.block.number;
   contractCall.blockTimestamp = event.block.timestamp;
   contractCall.transactionHash = event.transaction.hash;
@@ -98,6 +100,7 @@ export function handleWrapNativeToken(event: WrapNativeTokenEvent): void {
   contractCall.target = event.params.token;
   contractCall.data = Bytes.empty();
   contractCall.value = event.params.amount;
+  contractCall.transactionType = "WrapNativeToken"; // Set transaction type
   contractCall.blockNumber = event.block.number;
   contractCall.blockTimestamp = event.block.timestamp;
   contractCall.transactionHash = event.transaction.hash;
@@ -133,6 +136,7 @@ export function handleUnwrapNativeToken(event: UnwrapNativeTokenEvent): void {
   contractCall.target = event.params.token;
   contractCall.data = Bytes.empty();
   contractCall.value = event.params.amount;
+  contractCall.transactionType = "UnwrapNativeToken"; // Set transaction type
   contractCall.blockNumber = event.block.number;
   contractCall.blockTimestamp = event.block.timestamp;
   contractCall.transactionHash = event.transaction.hash;
