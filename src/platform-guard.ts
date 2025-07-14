@@ -14,27 +14,38 @@ import {
 } from "../generated/schema";
 
 // Helper function to update ContractCall with transaction type
-function updateContractCallType(txHash: Bytes, transactionType: string): void {
-  // Try to find existing ContractCall in same transaction
-  // Since we don't know the exact logIndex, we'll search by transaction hash pattern
-  let contractCallId = txHash.concatI32(0); // Try common log indices
-  let contractCall = ContractCall.load(contractCallId);
+function updateContractCallType(txHash: Bytes, transactionType: string, value: BigInt = BigInt.zero()): void {
+  // Try to find existing ContractCall in same transaction by searching multiple logIndex values
+  // Since platform events typically come after contract calls, we'll search a range of indices
+  let contractCall: ContractCall | null = null;
   
-  if (!contractCall) {
-    contractCallId = txHash.concatI32(1);
-    contractCall = ContractCall.load(contractCallId);
-  }
-  
-  if (!contractCall) {
-    contractCallId = txHash.concatI32(2);
-    contractCall = ContractCall.load(contractCallId);
+  // Search through a wider range of potential logIndex values (0 to 9)
+  for (let i = 0; i < 10; i++) {
+    let candidateId = txHash.concatI32(i);
+    let candidateCall = ContractCall.load(candidateId);
+    
+    if (candidateCall) {
+      contractCall = candidateCall;
+      break;
+    }
   }
   
   if (contractCall) {
     contractCall.transactionType = transactionType;
+    
+    // Update value if provided and current value is zero
+    if (value.gt(BigInt.zero()) && contractCall.value.equals(BigInt.zero())) {
+      contractCall.value = value;
+      log.info("Updated ContractCall {} value to: {}", [
+        contractCall.id.toHexString(), 
+        value.toString()
+      ]);
+    }
+    
     contractCall.save();
-    log.info("Updated ContractCall {} with type: {}", [contractCallId.toHexString(), transactionType]);
+    log.info("Updated ContractCall {} with type: {}", [contractCall.id.toHexString(), transactionType]);
   } else {
+    // If we still can't find it, try to create a synthetic record
     log.warning("Could not find ContractCall to update for tx: {}", [txHash.toHexString()]);
   }
 }
@@ -42,12 +53,16 @@ function updateContractCallType(txHash: Bytes, transactionType: string): void {
 // DEX activities
 export function handleExchangeFrom(event: ExchangeFromEvent): void {
   log.info("Handling ExchangeFrom event for vault: {}", [event.params.vault.toHexString()]);
-  updateContractCallType(event.transaction.hash, "Exchange");
+  
+  // Pass sourceAmount from the event
+  updateContractCallType(event.transaction.hash, "Exchange", event.params.sourceAmount);
 }
 
 export function handleExchangeTo(event: ExchangeToEvent): void {
   log.info("Handling ExchangeTo event for vault: {}", [event.params.vault.toHexString()]);
-  updateContractCallType(event.transaction.hash, "Exchange");
+  
+  // Pass dstAmount from the event
+  updateContractCallType(event.transaction.hash, "Exchange", event.params.dstAmount);
 }
 
 export function handleAddLiquidity(event: AddLiquidityEvent): void {
@@ -63,15 +78,19 @@ export function handleRemoveLiquidity(event: RemoveLiquidityEvent): void {
 // Other platform activities
 export function handleUnwrapNativeToken(event: UnwrapNativeTokenEvent): void {
   log.info("Handling UnwrapNativeToken event for vault: {}", [event.params.vault.toHexString()]);
-  updateContractCallType(event.transaction.hash, "UnwrapNativeToken");
+  
+  // Pass amountMinimum from the event
+  updateContractCallType(event.transaction.hash, "UnwrapNativeToken", event.params.amountMinimum);
 }
 
 export function handleVertexDeposit(event: VertexDepositEvent): void {
   log.info("Handling VertexDeposit event for vault: {}", [event.params.vault.toHexString()]);
-  updateContractCallType(event.transaction.hash, "Stake"); // Vertex deposits are staking operations
+  
+  // Pass amount from Vertex deposit
+  updateContractCallType(event.transaction.hash, "Stake", event.params.amount); 
 }
 
 export function handleVertexSlowMode(event: VertexSlowModeEvent): void {
   log.info("Handling VertexSlowMode event for vault: {}", [event.params.vault.toHexString()]);
-  updateContractCallType(event.transaction.hash, "NotUsed"); // Special vertex operation
-} 
+  updateContractCallType(event.transaction.hash, "NotUsed");
+}

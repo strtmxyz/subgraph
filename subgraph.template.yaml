@@ -249,3 +249,33 @@ templates:
         - event: Initialized(uint64)
           handler: handleInitialized
       file: ./src/asset-guard.ts
+
+  # ETH Guard Template - for tracking native ETH transfers
+  - kind: ethereum
+    name: ETHGuard
+    network: {{ network }}
+    source:
+      abi: ETHGuard
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - ContractCall
+        - ExternalTokenTransfer
+      abis:
+        - name: ETHGuard
+          file: ./abi/ETHGuard.json
+      eventHandlers:
+        # External token operations (same as ERC20Guard)
+        - event: ERC20Approval(address,address,address,uint256)
+          handler: handleERC20Approval
+        - event: ERC721Approval(address,address,address,uint256)
+          handler: handleERC721Approval
+        - event: WrapNativeToken(address,address,uint256)
+          handler: handleWrapNativeToken
+        - event: UnwrapNativeToken(address,address,uint256)
+          handler: handleUnwrapNativeToken
+        - event: Initialized(uint64)
+          handler: handleInitialized
+      file: ./src/asset-guard.ts

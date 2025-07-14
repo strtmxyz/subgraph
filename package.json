@@ -22,7 +22,7 @@
     "goldsky:auth": "goldsky login",
     "goldsky:deploy:monad": "yarn switch:monad && goldsky subgraph deploy strtm-monad/v1.1.0 --from-abi",
     "goldsky:deploy:arbitrum": "yarn switch:arbitrum && goldsky subgraph deploy strtm-arbitrum/v1.1.0 --from-abi",
-    "goldsky:delete:monad": "goldsky subgraph delete strtm-monad",
+    "goldsky:delete:monad": "goldsky subgraph delete strtm-monad/v1.1.0",
     "goldsky:delete:arbitrum": "goldsky subgraph delete strtm-arbitrum",
     "goldsky:list": "goldsky subgraph list",
     "goldsky:logs:monad": "goldsky subgraph logs strtm-monad",

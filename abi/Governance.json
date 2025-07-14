@@ -1,11 +1,28 @@
 [
   {
-    "inputs": [],
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "extContract",
+        "type": "address"
+      }
+    ],
     "name": "InvalidExtContractAddress",
     "type": "error"
   },
   {
-    "inputs": [],
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "guardAddress",
+        "type": "address"
+      },
+      {
+        "internalType": "string",
+        "name": "context",
+        "type": "string"
+      }
+    ],
     "name": "InvalidGuardAddress",
     "type": "error"
   },
