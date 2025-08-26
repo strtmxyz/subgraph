@@ -11,9 +11,14 @@ type Vault @entity {
   totalAssets: BigInt!
   totalSupply: BigInt!
   sharePrice: BigInt!
-  aum: BigInt! # Assets Under Management (current market value)
+  aum: BigInt! # Assets Under Management (current market value in USD)
+  totalValueUSD: BigInt! # Total value in USD from getVaultInfo
   currentEpoch: BigInt!
   state: VaultState!
+  
+  # Fee configuration (fixed per vault, don't change per epoch)
+  managerFee: BigInt! # Manager fee in basis points (configurable per vault)
+  withdrawalFee: BigInt! # Withdrawal fee in basis points (configurable per vault)
   
   # Oracle protection
   harvestCooldown: BigInt!
@@ -200,6 +205,8 @@ type VaultValueChange @entity(immutable: true) {
   newSharePrice: BigInt!
   oldAum: BigInt!
   newAum: BigInt!
+  oldTotalValueUSD: BigInt!
+  newTotalValueUSD: BigInt!
   
   # Change trigger
   changeType: VaultValueChangeType!
@@ -345,6 +352,36 @@ type DailyProtocolStat @entity {
   totalUsers: BigInt!
   activeUsers: BigInt!
   newUsers: BigInt!
+}
+
+type ProtocolMetrics @entity {
+  id: ID! # "protocol"
+  
+  # Running totals
+  totalValueLocked: BigInt!
+  totalVaults: BigInt!
+  activeVaults: BigInt!
+  totalUsers: BigInt!
+  
+  # Last update
+  lastUpdate: BigInt!
+}
+
+type ProtocolConstants @entity {
+  id: ID! # "constants"
+  
+  # Fixed protocol fees (constants, never change)
+  protocolManagementFee: BigInt!
+  protocolPerformanceFee: BigInt!
+  managerPerformanceFee: BigInt!
+  
+  # Fee limits (constants, never change)
+  maxManagerFee: BigInt!
+  maxWithdrawalFee: BigInt!
+  feeDenominator: BigInt!
+  
+  # Last update
+  lastUpdate: BigInt!
 }
 
 # Enums

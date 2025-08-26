@@ -5,8 +5,6 @@ import {
   AddLiquidity as AddLiquidityEvent,
   RemoveLiquidity as RemoveLiquidityEvent,
   UnwrapNativeToken as UnwrapNativeTokenEvent,
-  VertexDeposit as VertexDepositEvent,
-  VertexSlowMode as VertexSlowModeEvent,
 } from "../generated/templates/PlatformGuard/IPlatformGuard";
 
 import {
@@ -81,16 +79,4 @@ export function handleUnwrapNativeToken(event: UnwrapNativeTokenEvent): void {
   
   // Pass amountMinimum from the event
   updateContractCallType(event.transaction.hash, "UnwrapNativeToken", event.params.amountMinimum);
-}
-
-export function handleVertexDeposit(event: VertexDepositEvent): void {
-  log.info("Handling VertexDeposit event for vault: {}", [event.params.vault.toHexString()]);
-  
-  // Pass amount from Vertex deposit
-  updateContractCallType(event.transaction.hash, "Stake", event.params.amount); 
-}
-
-export function handleVertexSlowMode(event: VertexSlowModeEvent): void {
-  log.info("Handling VertexSlowMode event for vault: {}", [event.params.vault.toHexString()]);
-  updateContractCallType(event.transaction.hash, "NotUsed");
 }

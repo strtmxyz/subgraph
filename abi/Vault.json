@@ -790,25 +790,6 @@
     "anonymous": false,
     "inputs": [
       {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "totalConvertedValue",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "timestamp",
-        "type": "uint256"
-      }
-    ],
-    "name": "AllPositionsLiquidated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
         "indexed": true,
         "internalType": "address",
         "name": "owner",
@@ -1516,9 +1497,15 @@
   },
   {
     "inputs": [],
-    "name": "advanceEpoch",
-    "outputs": [],
-    "stateMutability": "nonpayable",
+    "name": "admin",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -1844,25 +1831,6 @@
   {
     "inputs": [
       {
-        "internalType": "bytes",
-        "name": "returnData",
-        "type": "bytes"
-      }
-    ],
-    "name": "decodeRevertReason",
-    "outputs": [
-      {
-        "internalType": "string",
-        "name": "reason",
-        "type": "string"
-      }
-    ],
-    "stateMutability": "pure",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
         "internalType": "uint256",
         "name": "assets",
         "type": "uint256"
@@ -1886,19 +1854,31 @@
   },
   {
     "inputs": [],
-    "name": "emergencyLiquidateAll",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
     "name": "emergencyOracleMode",
     "outputs": [
       {
         "internalType": "bool",
         "name": "",
         "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "epochDepositsAfterBaseline",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -1963,19 +1943,6 @@
         "internalType": "address",
         "name": "",
         "type": "address"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "fundraisingDuration",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -2120,6 +2087,29 @@
   },
   {
     "inputs": [],
+    "name": "getVaultAssetBreakdown",
+    "outputs": [
+      {
+        "internalType": "address[]",
+        "name": "assetAddresses",
+        "type": "address[]"
+      },
+      {
+        "internalType": "uint256[]",
+        "name": "assetBalances",
+        "type": "uint256[]"
+      },
+      {
+        "internalType": "uint256[]",
+        "name": "assetValues",
+        "type": "uint256[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "getVaultInfo",
     "outputs": [
       {
@@ -2150,6 +2140,55 @@
       {
         "internalType": "uint256",
         "name": "minDeposit",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "totalValueUSD",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "requestedAssets",
+        "type": "uint256"
+      }
+    ],
+    "name": "getWithdrawalInfo",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "canWithdraw",
+        "type": "bool"
+      },
+      {
+        "internalType": "uint256",
+        "name": "actualWithdrawable",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "assetsAfterFees",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "requiredLiquidation",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "liquidationImpact",
         "type": "uint256"
       }
     ],
@@ -2248,6 +2287,25 @@
     "inputs": [
       {
         "internalType": "address",
+        "name": "_strategy",
+        "type": "address"
+      }
+    ],
+    "name": "isStrategyAuthorized",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
         "name": "asset",
         "type": "address"
       }
@@ -2293,13 +2351,6 @@
       }
     ],
     "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "liquidateAllPositionsForHarvest",
-    "outputs": [],
-    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -2547,6 +2598,45 @@
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+      }
+    ],
+    "name": "previewActualWithdrawable",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "withdrawableAssets",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "userTrueValue",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "currentUnderlyingBalance",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "totalVaultValue",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "userSharePercentage",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256",
         "name": "assets",
         "type": "uint256"
@@ -2614,49 +2704,6 @@
       {
         "internalType": "uint256",
         "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "assets",
-        "type": "uint256"
-      }
-    ],
-    "name": "previewWithdrawalAfterFees",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "assetsAfterFee",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "name": "previewWithdrawalImpact",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "willAutoRealize",
-        "type": "bool"
-      },
-      {
-        "internalType": "uint256",
-        "name": "estimatedFeesToPay",
         "type": "uint256"
       }
     ],
@@ -3004,11 +3051,6 @@
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "_fundraisingDuration",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
         "name": "_minFundraisingAmount",
         "type": "uint256"
       }
@@ -3152,5 +3194,9 @@
     ],
     "stateMutability": "view",
     "type": "function"
+  },
+  {
+    "stateMutability": "payable",
+    "type": "receive"
   }
 ]

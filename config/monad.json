@@ -1,7 +1,7 @@
 {
   "network": "monad-testnet",
-  "address": "0x187eBab83F01BC32975a051adb69171b23dEEeca", 
-  "startBlock": 25731365,
-  "governance": "0xA77449604aF0b34d93C834dA7c2A95b21BDB5fbC",
-  "governanceStartBlock": 25731365
+  "address": "0x82374cb97EcbeB03fF7426905dE997fdC0a98ae7", 
+  "startBlock": 31435308,
+  "governance": "0x4bc7fF2BaBF5331C28ecA8E3d1E79f9598Bf603E",
+  "governanceStartBlock": 31435308
 } 

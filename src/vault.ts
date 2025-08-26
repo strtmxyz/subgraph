@@ -8,7 +8,6 @@ import {
   Withdrawn as WithdrawnEvent,
   ContractCalled as ContractCalledEvent,
   AutoRealizationTriggered as AutoRealizationTriggeredEvent,
-  AllPositionsLiquidated as AllPositionsLiquidatedEvent,
   OracleProtectionUpdated as OracleProtectionUpdatedEvent,
   EmergencyOracleModeActivated as EmergencyOracleModeActivatedEvent,
   HarvestBlocked as HarvestBlockedEvent,
@@ -30,19 +29,24 @@ import {
   StateChange,
   ContractCall,
   AutoRealization,
-  AllPositionsLiquidation,
   VaultValueChange,
   DailyVaultStat,
   DailyProtocolStat,
   YieldHarvested,
   ExternalTokenTransfer,
+  VaultFactory,
+  ProtocolMetrics,
+  ProtocolConstants,
 } from "../generated/schema";
 
 import { Vault as VaultContract } from "../generated/templates/Vault/Vault";
+import { FACTORY_ADDRESS } from "./constants";
 
 // Helper functions
 function getOrCreateUser(address: Address): User {
   let user = User.load(address);
+  let isNewUser = false;
+  
   if (!user) {
     user = new User(address);
     user.totalDeposited = BigInt.zero();
@@ -50,7 +54,16 @@ function getOrCreateUser(address: Address): User {
     user.vaultCount = BigInt.zero();
     user.firstDepositAt = BigInt.zero();
     user.lastActivityAt = BigInt.zero();
+    isNewUser = true;
   }
+  
+  // Update protocol metrics for new users
+  if (isNewUser) {
+    let protocolMetrics = getOrCreateProtocolMetrics();
+    protocolMetrics.totalUsers = protocolMetrics.totalUsers.plus(BigInt.fromI32(1));
+    protocolMetrics.save();
+  }
+  
   return user;
 }
 
@@ -89,6 +102,7 @@ function createVaultValueChange(
   oldTotalSupply: BigInt, 
   oldSharePrice: BigInt, 
   oldAum: BigInt,
+  oldTotalValueUSD: BigInt,
   changeType: string,
   triggerEvent: string,
   blockNumber: BigInt,
@@ -109,6 +123,8 @@ function createVaultValueChange(
   valueChange.newSharePrice = vault.sharePrice;
   valueChange.oldAum = oldAum;
   valueChange.newAum = vault.aum;
+  valueChange.oldTotalValueUSD = oldTotalValueUSD;
+  valueChange.newTotalValueUSD = vault.totalValueUSD;
   valueChange.changeType = changeType;
   valueChange.triggerEvent = triggerEvent;
   valueChange.blockNumber = blockNumber;
@@ -125,11 +141,17 @@ function calculateAndUpdateAUM(vault: Vault, changeType: string = "MANUAL_SYNC",
   let oldTotalSupply = vault.totalSupply;
   let oldSharePrice = vault.sharePrice;
   let oldAum = vault.aum;
+  let oldTotalValueUSD = vault.totalValueUSD;
   
-  // Try to get real-time totalAssets from contract
+  // Try to get real-time data from contract
   let vaultContract = VaultContract.bind(Address.fromBytes(vault.id));
   let totalAssetsCall = vaultContract.try_totalAssets();
   let totalSupplyCall = vaultContract.try_totalSupply();
+  let vaultInfoCall = vaultContract.try_getVaultInfo();
+  
+  // Get fee configuration
+  let managerFeeCall = vaultContract.try_managerFee();
+  let withdrawalFeeCall = vaultContract.try_withdrawalFee();
   
   if (!totalAssetsCall.reverted) {
     vault.totalAssets = totalAssetsCall.value;
@@ -141,6 +163,23 @@ function calculateAndUpdateAUM(vault: Vault, changeType: string = "MANUAL_SYNC",
     log.info("Updated totalSupply from contract call: {}", [totalSupplyCall.value.toString()]);
   }
   
+  // Get USD value from getVaultInfo
+  if (!vaultInfoCall.reverted) {
+    let totalValueUSD = vaultInfoCall.value.getTotalValueUSD();
+    log.info("Updated totalValueUSD from getVaultInfo: {}", [totalValueUSD.toString()]);
+    
+    // Store USD value separately
+    vault.totalValueUSD = totalValueUSD;
+    
+    // AUM = Total Value in USD (real-time USD value)
+    vault.aum = totalValueUSD;
+  } else {
+    // Fallback to totalAssets if getVaultInfo fails
+    vault.aum = vault.totalAssets;
+    vault.totalValueUSD = BigInt.zero(); // Set to zero if not available
+    log.warning("getVaultInfo failed, using totalAssets as fallback for vault: {}", [vault.id.toHexString()]);
+  }
+  
   // Calculate real-time share price
   if (vault.totalSupply.gt(BigInt.zero())) {
     vault.sharePrice = vault.totalAssets.times(BigInt.fromI32(10).pow(18)).div(vault.totalSupply);
@@ -148,31 +187,42 @@ function calculateAndUpdateAUM(vault: Vault, changeType: string = "MANUAL_SYNC",
     vault.sharePrice = BigInt.fromI32(1).times(BigInt.fromI32(10).pow(18)); // Default 1e18
   }
   
-  // AUM = Total Assets Under Management (real-time value)
-  vault.aum = vault.totalAssets;
+  // Update fee configuration only if not already set (fees don't change per epoch)
+  if (vault.managerFee.equals(BigInt.zero()) && !managerFeeCall.reverted) {
+    vault.managerFee = BigInt.fromI32(managerFeeCall.value);
+    log.info("Initialized managerFee: {}", [vault.managerFee.toString()]);
+  }
+  
+  if (vault.withdrawalFee.equals(BigInt.zero()) && !withdrawalFeeCall.reverted) {
+    vault.withdrawalFee = BigInt.fromI32(withdrawalFeeCall.value);
+    log.info("Initialized withdrawalFee: {}", [vault.withdrawalFee.toString()]);
+  }
   
   // Update tracking fields
   vault.lastValueUpdate = blockTimestamp;
   vault.valueUpdateCount = vault.valueUpdateCount.plus(BigInt.fromI32(1));
   
-  log.info("Updated vault metrics - totalAssets: {}, totalSupply: {}, sharePrice: {}, aum: {}", [
+  log.info("Updated vault metrics - totalAssets: {}, totalSupply: {}, sharePrice: {}, aum: {}, totalValueUSD: {}", [
     vault.totalAssets.toString(),
     vault.totalSupply.toString(),
     vault.sharePrice.toString(),
-    vault.aum.toString()
+    vault.aum.toString(),
+    vault.totalValueUSD.toString()
   ]);
   
   // Create value change record if values actually changed
   if (!oldTotalAssets.equals(vault.totalAssets) || 
       !oldTotalSupply.equals(vault.totalSupply) || 
       !oldSharePrice.equals(vault.sharePrice) || 
-      !oldAum.equals(vault.aum)) {
+      !oldAum.equals(vault.aum) ||
+      !oldTotalValueUSD.equals(vault.totalValueUSD)) {
     createVaultValueChange(
       vault, 
       oldTotalAssets, 
       oldTotalSupply, 
       oldSharePrice, 
       oldAum,
+      oldTotalValueUSD,
       changeType,
       triggerEvent,
       blockNumber,
@@ -180,6 +230,9 @@ function calculateAndUpdateAUM(vault: Vault, changeType: string = "MANUAL_SYNC",
       transactionHash,
       logIndex
     );
+    
+    // Update protocol metrics when AUM changes
+    updateProtocolMetrics(vault.id, oldAum, vault.aum);
   }
 }
 
@@ -222,6 +275,199 @@ function updateDailyStats(vaultAddress: Address, timestamp: BigInt, depositAmoun
   }
   
   dailyStat.save();
+  
+  // Update protocol stats
+  updateProtocolStats(timestamp, depositAmount, withdrawAmount);
+}
+
+// Protocol-level daily stats update
+function updateProtocolStats(timestamp: BigInt, depositAmount: BigInt, withdrawAmount: BigInt): void {
+  // Round timestamp to day
+  let day = timestamp.toI32() / 86400 * 86400;
+  let dayId = day.toString();
+  
+  let protocolStat = DailyProtocolStat.load(dayId);
+  if (!protocolStat) {
+    protocolStat = new DailyProtocolStat(dayId);
+    protocolStat.date = day;
+    protocolStat.totalValueLocked = BigInt.zero();
+    protocolStat.totalVaults = BigInt.zero();
+    protocolStat.activeVaults = BigInt.zero();
+    protocolStat.dailyVolume = BigInt.zero();
+    protocolStat.dailyDeposits = BigInt.zero();
+    protocolStat.dailyWithdrawals = BigInt.zero();
+    protocolStat.totalUsers = BigInt.zero();
+    protocolStat.activeUsers = BigInt.zero();
+    protocolStat.newUsers = BigInt.zero();
+  }
+  
+  // Update volume metrics
+  protocolStat.dailyDeposits = protocolStat.dailyDeposits.plus(depositAmount);
+  protocolStat.dailyWithdrawals = protocolStat.dailyWithdrawals.plus(withdrawAmount);
+  protocolStat.dailyVolume = protocolStat.dailyVolume.plus(depositAmount).plus(withdrawAmount);
+  
+  // Calculate protocol-level metrics
+  calculateProtocolMetrics(protocolStat);
+  
+  protocolStat.save();
+}
+
+// Get or create protocol metrics entity
+function getOrCreateProtocolMetrics(): ProtocolMetrics {
+  let metrics = ProtocolMetrics.load("protocol");
+  if (!metrics) {
+    metrics = new ProtocolMetrics("protocol");
+    metrics.totalValueLocked = BigInt.zero();
+    metrics.totalVaults = BigInt.zero();
+    metrics.activeVaults = BigInt.zero();
+    metrics.totalUsers = BigInt.zero();
+    metrics.lastUpdate = BigInt.zero();
+  }
+  return metrics;
+}
+
+// Helper function to get or create ProtocolConstants
+function getOrCreateProtocolConstants(): ProtocolConstants {
+  let constants = ProtocolConstants.load("constants");
+  if (!constants) {
+    constants = new ProtocolConstants("constants");
+    constants.protocolManagementFee = BigInt.zero();
+    constants.protocolPerformanceFee = BigInt.zero();
+    constants.managerPerformanceFee = BigInt.zero();
+    constants.maxManagerFee = BigInt.zero();
+    constants.maxWithdrawalFee = BigInt.zero();
+    constants.feeDenominator = BigInt.zero();
+    constants.lastUpdate = BigInt.zero();
+  }
+  return constants;
+}
+
+// Function to update vault fees (only called when fees actually change)
+function updateVaultFees(vault: Vault, vaultContract: VaultContract): void {
+  let managerFeeCall = vaultContract.try_managerFee();
+  let withdrawalFeeCall = vaultContract.try_withdrawalFee();
+  
+  if (!managerFeeCall.reverted) {
+    let newManagerFee = BigInt.fromI32(managerFeeCall.value);
+    if (!vault.managerFee.equals(newManagerFee)) {
+      vault.managerFee = newManagerFee;
+      log.info("Updated managerFee for vault {}: {}", [vault.id.toHexString(), vault.managerFee.toString()]);
+    }
+  }
+  
+  if (!withdrawalFeeCall.reverted) {
+    let newWithdrawalFee = BigInt.fromI32(withdrawalFeeCall.value);
+    if (!vault.withdrawalFee.equals(newWithdrawalFee)) {
+      vault.withdrawalFee = newWithdrawalFee;
+      log.info("Updated withdrawalFee for vault {}: {}", [vault.id.toHexString(), vault.withdrawalFee.toString()]);
+    }
+  }
+}
+
+// Function to update protocol constants (fixed fees, only called once)
+function updateProtocolConstants(vaultContract: VaultContract): void {
+  let constants = getOrCreateProtocolConstants();
+  
+  // Only update if not already set (constants don't change)
+  if (constants.protocolManagementFee.equals(BigInt.zero())) {
+    let protocolManagementFeeCall = vaultContract.try_PROTOCOL_MANAGEMENT_FEE();
+    if (!protocolManagementFeeCall.reverted) {
+      constants.protocolManagementFee = protocolManagementFeeCall.value;
+      log.info("Initialized protocolManagementFee: {}", [constants.protocolManagementFee.toString()]);
+    }
+  }
+  
+  if (constants.protocolPerformanceFee.equals(BigInt.zero())) {
+    let protocolPerformanceFeeCall = vaultContract.try_PROTOCOL_PERFORMANCE_FEE();
+    if (!protocolPerformanceFeeCall.reverted) {
+      constants.protocolPerformanceFee = protocolPerformanceFeeCall.value;
+      log.info("Initialized protocolPerformanceFee: {}", [constants.protocolPerformanceFee.toString()]);
+    }
+  }
+  
+  if (constants.managerPerformanceFee.equals(BigInt.zero())) {
+    let managerPerformanceFeeCall = vaultContract.try_MANAGER_PERFORMANCE_FEE();
+    if (!managerPerformanceFeeCall.reverted) {
+      constants.managerPerformanceFee = managerPerformanceFeeCall.value;
+      log.info("Initialized managerPerformanceFee: {}", [constants.managerPerformanceFee.toString()]);
+    }
+  }
+  
+  if (constants.maxManagerFee.equals(BigInt.zero())) {
+    let maxManagerFeeCall = vaultContract.try_MAX_MANAGER_FEE();
+    if (!maxManagerFeeCall.reverted) {
+      constants.maxManagerFee = maxManagerFeeCall.value;
+      log.info("Initialized maxManagerFee: {}", [constants.maxManagerFee.toString()]);
+    }
+  }
+  
+  if (constants.maxWithdrawalFee.equals(BigInt.zero())) {
+    let maxWithdrawalFeeCall = vaultContract.try_MAX_WITHDRAWAL_FEE();
+    if (!maxWithdrawalFeeCall.reverted) {
+      constants.maxWithdrawalFee = maxWithdrawalFeeCall.value;
+      log.info("Initialized maxWithdrawalFee: {}", [constants.maxWithdrawalFee.toString()]);
+    }
+  }
+  
+  if (constants.feeDenominator.equals(BigInt.zero())) {
+    let feeDenominatorCall = vaultContract.try_FEE_DENOMINATOR();
+    if (!feeDenominatorCall.reverted) {
+      constants.feeDenominator = feeDenominatorCall.value;
+      log.info("Initialized feeDenominator: {}", [constants.feeDenominator.toString()]);
+    }
+  }
+  
+  constants.lastUpdate = BigInt.fromI32(0); // Placeholder timestamp
+  constants.save();
+}
+
+// Calculate protocol-level metrics
+function calculateProtocolMetrics(protocolStat: DailyProtocolStat): void {
+  // Get total vaults from factory
+  let factory = VaultFactory.load(Bytes.fromHexString(FACTORY_ADDRESS));
+  if (factory) {
+    protocolStat.totalVaults = factory.totalVaults;
+  }
+  
+  // Get running totals from ProtocolMetrics entity
+  let protocolMetrics = getOrCreateProtocolMetrics();
+  
+  // Use running totals for daily stats
+  protocolStat.totalValueLocked = protocolMetrics.totalValueLocked;
+  protocolStat.activeVaults = protocolMetrics.activeVaults;
+  protocolStat.totalUsers = protocolMetrics.totalUsers;
+  
+  // For now, set active users and new users to zero
+  // These would need more complex tracking logic
+  protocolStat.activeUsers = BigInt.zero();
+  protocolStat.newUsers = BigInt.zero();
+}
+
+// Update protocol metrics when vault AUM changes
+function updateProtocolMetrics(vaultAddress: Bytes, oldAum: BigInt, newAum: BigInt, isNewVault: boolean = false): void {
+  let protocolMetrics = getOrCreateProtocolMetrics();
+  
+  // Update TVL
+  if (oldAum.gt(BigInt.zero())) {
+    protocolMetrics.totalValueLocked = protocolMetrics.totalValueLocked.minus(oldAum);
+  }
+  if (newAum.gt(BigInt.zero())) {
+    protocolMetrics.totalValueLocked = protocolMetrics.totalValueLocked.plus(newAum);
+  }
+  
+  // Update vault count if it's a new vault
+  if (isNewVault) {
+    protocolMetrics.totalVaults = protocolMetrics.totalVaults.plus(BigInt.fromI32(1));
+  }
+  
+  // Update active vaults count (simplified approach)
+  let factory = VaultFactory.load(Bytes.fromHexString(FACTORY_ADDRESS));
+  if (factory) {
+    protocolMetrics.activeVaults = factory.totalVaults; // Simplified: assume all vaults are active
+  }
+  
+  protocolMetrics.lastUpdate = BigInt.fromI32(0); // Will be set to actual timestamp when called
+  protocolMetrics.save();
 }
 
 // Core vault lifecycle
@@ -463,27 +709,6 @@ export function handleAutoRealizationTriggered(event: AutoRealizationTriggeredEv
   autoRealization.blockTimestamp = event.block.timestamp;
   autoRealization.transactionHash = event.transaction.hash;
   autoRealization.save();
-}
-
-export function handleAllPositionsLiquidated(event: AllPositionsLiquidatedEvent): void {
-  log.info("Handling AllPositionsLiquidated event for vault: {}", [event.address.toHexString()]);
-
-  let vault = Vault.load(event.address);
-  if (vault) {
-    vault.state = "LIQUIDATED";
-    vault.save();
-  }
-
-  // Create AllPositionsLiquidation event
-  let liquidation = new AllPositionsLiquidation(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  );
-  liquidation.vault = event.address;
-  liquidation.totalConvertedValue = event.params.totalConvertedValue;
-  liquidation.blockNumber = event.block.number;
-  liquidation.blockTimestamp = event.block.timestamp;
-  liquidation.transactionHash = event.transaction.hash;
-  liquidation.save();
 }
 
 // Oracle protection

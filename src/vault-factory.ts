@@ -30,6 +30,7 @@ import {
   OwnershipTransferred,
   Paused,
   Unpaused,
+  ProtocolMetrics,
 } from "../generated/schema";
 
 import { Vault as VaultTemplate } from "../generated/templates";
@@ -73,8 +74,13 @@ export function handleVaultCreated(event: VaultCreatedEvent): void {
   vault.totalSupply = BigInt.zero();
   vault.sharePrice = BigInt.fromI32(1).times(BigInt.fromI32(10).pow(18)); // 1e18
   vault.aum = BigInt.zero(); // Assets Under Management starts at 0
+  vault.totalValueUSD = BigInt.zero(); // Total value in USD starts at 0
   vault.currentEpoch = BigInt.zero();
   vault.state = "FUNDRAISING";
+  
+  // Initialize fee configuration (fixed per vault, don't change per epoch)
+  vault.managerFee = BigInt.zero();
+  vault.withdrawalFee = BigInt.zero();
   
   // Oracle protection defaults
   vault.harvestCooldown = BigInt.zero();
@@ -95,6 +101,14 @@ export function handleVaultCreated(event: VaultCreatedEvent): void {
   vault.transactionHash = event.transaction.hash;
   
   vault.save();
+
+  // Update protocol metrics for new vault
+  let protocolMetrics = ProtocolMetrics.load("protocol");
+  if (protocolMetrics) {
+    protocolMetrics.totalVaults = protocolMetrics.totalVaults.plus(BigInt.fromI32(1));
+    protocolMetrics.activeVaults = protocolMetrics.activeVaults.plus(BigInt.fromI32(1));
+    protocolMetrics.save();
+  }
 
   // Create VaultCreated event
   let vaultCreatedEvent = new VaultCreated(

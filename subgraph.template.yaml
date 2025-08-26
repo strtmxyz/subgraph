@@ -155,8 +155,6 @@ templates:
           handler: handleContractCalled
         - event: AutoRealizationTriggered(indexed address,uint256,uint256,uint256)
           handler: handleAutoRealizationTriggered
-        - event: AllPositionsLiquidated(uint256,uint256)
-          handler: handleAllPositionsLiquidated
         
         # Oracle protection
         - event: OracleProtectionUpdated(uint256,uint256,bool)
@@ -214,10 +212,6 @@ templates:
         # Other platform activities
         - event: UnwrapNativeToken(address,address,uint256)
           handler: handleUnwrapNativeToken
-        - event: VertexDeposit(address,address,uint256)
-          handler: handleVertexDeposit
-        - event: VertexSlowMode(address,address,uint256)
-          handler: handleVertexSlowMode
       file: ./src/platform-guard.ts
 
   # Asset Guard Template - for tracking external token transfers
